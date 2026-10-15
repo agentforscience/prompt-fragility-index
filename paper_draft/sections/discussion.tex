@@ -1,0 +1,99 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Why do ``cosmetic'' edits break classification?}
+\label{sec:mechanisms}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Condition} & Business & World & Sports & Sci/Tech \\
+\midrule
+original & 42 & 26 & 21 & 11 \\
+\caps, seed 0 (all lowercase) & 29 & 12 & 12 & {\bf 46} \\
+\caps, seed 1 (random case) & 42 & {\bf 4} & {\bf 42}$^\ast$ & 10 \\
+\punct, seed 0 (commas removed) & 23 & {\bf 55} + 10$^\ddagger$ & 3 & 9 \\
+\bottomrule
+\end{tabular}
+\caption{Predicted-label counts for \qwen on \agnews (out of 100 items). Edits to the casing or punctuation of the label list shift the model's label preferences, and removing the commas makes ``World Sports'' look like a single label. Large shifts from the original distribution are in \textbf{bold}. $^\ast$Includes re-cased outputs such as ``SPOrts''. $^\ddagger$Outputs of the merged label ``World Sports''.}
+\label{tab:labels}
+\end{table}
+
+\Tabref{tab:labels} shows how \qwen's predictions on \agnews change under the two damaging edits. The edits do not change the task wording; they change the \emph{answer-space specification}. Removing the commas from ``World, Sports, Business, and Sci/Tech'' turns the list into ``World Sports Business and Sci/Tech:'', and the model then predicts ``World'' 55 times and ``World Sports'' 10 more times. Lowercasing the list moves predictions toward ``sci/tech'' (11 $\to$ 46). Random re-casing nearly removes ``World'' (26 $\to$ 4) while doubling ``Sports''. These are content errors, not format errors: accuracy among parsed outputs falls from 75\% to 50--60\%. The two-label \sst instruction (``positive or negative'') survives the same edits unharmed. Fragility therefore follows the size and delimitation of the label set more than the edit category. A taxonomy that labels capitalization and punctuation as cosmetic misses that these edits can rewrite the part of the prompt that defines the possible answers.
+
+\subsection{Why is generation not the most fragile, yet the only one that compounds?}
+
+The \squad instruction states its format constraint twice: the answer is ``a short span copied directly from the passage'', and the model should give ``only the answer span, without any explanation''. A single edit rarely removes both, so single-edit drops stay small (\pfi 0.03). Under the \combo{semantic2}, \combo{semantic3}, \combo{mixed3} and \combo{all6} combinations, \qwen's mean answer length grows from 3.0 to 4.8--7.3 words, and exact match falls from 0.77 to 0.40--0.61. The model starts answering in full sentences, for example ``John Myhill'' becomes ``John Myhill provided a definition of linear bounded automata in 1960.'' Each edit weakens the format constraint a little, and only together do they cross the point where the model abandons span-style answers. This is a plausible mechanism for the super-additivity we see only on generation. It also explains the contrast with classification: classification scores are bounded per item, so once an item is wrong it cannot get more wrong, and combined effects saturate.
+
+\subsection{Format fragility versus content fragility}
+\label{sec:format}
+
+\begin{table}[t]
+\centering
+\small
+\begin{subtable}[t]{0.47\linewidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Condition} & Parse failures & Acc.\ among parsed \\
+\midrule
+original    & 4\%  & 51\% \\
+\syn        & {\bf 32\%} & 51\% \\
+\punct      & 2\%  & {\bf 39\%} \\
+\combo{semantic3} & {\bf 48\%} & 38\% \\
+\combo{mixed3}    & {\bf 44\%} & 37\% \\
+\bottomrule
+\end{tabular}}
+\caption{Strict scoring, 8-token budget (both seeds).}
+\label{tab:format_a}
+\end{subtable}
+\hfill
+\begin{subtable}[t]{0.5\linewidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Condition} & 8 tok., strict & 48 tok., lenient & Unparsed \\
+\midrule
+original          & 49 & 50 & 3\% \\
+\syn, seed 0      & 21 & 44 & 18\% \\
+\combo{semantic3}, seed 0 & 1 & 40 & 16\% \\
+\combo{mixed3}, seed 0    & 9 & {\bf 52} & 6\% \\
+\bottomrule
+\end{tabular}}
+\caption{Accuracy (\%) re-scored with a 48-token budget and a lenient parser.}
+\label{tab:format_b}
+\end{subtable}
+\caption{Format versus content fragility for \llama on \arc. \captiona The \syn drop comes entirely from parse failures (accuracy among parsed outputs is unchanged at 51\%), while the \punct drop is a genuine content effect. \captionb With a generous budget and a lenient parser, most catastrophic drops disappear.}
+\label{tab:format}
+\end{table}
+
+Not every drop means the model got the answer wrong. \Tabref{tab:format}a splits \llama's \arc results into parse failures and accuracy among parsed outputs. The \syn edit rewrites ``Choose the single best answer'' as ``Pick the single most suitable answer'', and the model echoes this phrase as a preamble, which the 8-token budget cuts off before the letter. When the persona sentence is also moved (\combo{semantic3}, \combo{mixed3}), the model often opens with ``As a science teacher, I'd\dots''. Parse failures rise from 4\% to 32\%, while accuracy among parsed outputs stays at 51\%. The \syn drop is therefore entirely a format effect. The \punct drop, by contrast, comes with almost no parse failures and a 12-point fall in accuracy among parsed outputs, so it is a content effect.
+
+To measure how much of the format effect is truncation, we re-ran four \llama \arc conditions with a 48-token budget and a lenient extractor that also accepts patterns such as ``answer is X'' and ``option X'' (\tabref{tab:format}b). The original prompt barely changes (49 $\to$ 50). The catastrophic drops largely disappear: \combo{semantic3} recovers from 1\% to 40\% and \combo{mixed3} from 9\% to 52\%. A residual drop of 6--10 points remains for \syn and \combo{semantic3}, partly from answers that still have no letter within 48 tokens. Fragility is therefore partly a property of the \emph{evaluation protocol}. Strict, short-budget scoring matches what the prompt asks for (``only the letter''), but it inflates format-driven \pfi for weaker instruction followers. We encountered this issue ourselves. A pilot with a 3-token budget for \arc gave 14\% parse failures even for the \emph{original} prompt, because outputs such as ``The correct answer\dots'' were cut off. We discarded that run before any analysis and re-ran \arc with 8 tokens.
+
+\subsection{Edits can help}
+\label{sec:edits_help}
+
+Several edits significantly \emph{improve} accuracy. For \llama, \reord adds 7.0 points and \syn adds 6.0 points on \sst. On \agnews, \reord adds 11.0 points from the degenerate baseline: moving the label sentence away from its original position weakens the model's collapse onto the first-listed label ``World'', a bias related to those described by \citet{zhao2021calibrate}. The original wording is not privileged; it is one sample from a distribution of equivalent prompts, as \citet{mizrahi2024state} argue. Signed averages of \pfi can hide such gains, which is why we also report $|\pfi|$ and flip rates.
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+\para{Small models only.} We could not evaluate hosted frontier models because no API key was available, and the host had no GPU. Both models have 1--1.5B parameters and run at Q8\_0 quantization, which is near-lossless but not identical to bf16. Fragility generally decreases with scale and better instruction tuning, so our magnitudes should be read as upper-range values and not extrapolated to frontier models.
+
+\para{Statistical power.} With $n = 100$ items per task and 2 seeds per edit type, effects of 4--5 points often fall inside the CI. Only 5 of 48 edit $\times$ task cells survive Holm correction (4 excluding the degenerate \llama \agnews cell). More seeds would better separate the effect of an edit \emph{type} from that of a particular random edit.
+
+\para{One template per task.} Several effects come from specific template features, such as the comma-delimited label list or the persona sentence. Other base prompts could rank the edit types differently. Our results suggest that the ranking depends more on prompt structure than on edit category, but testing this requires several templates per task.
+
+\para{Task-type confound.} Each task type has only one or two tasks, so differences between types are confounded with dataset, label-set size, baseline accuracy and metric (\squad's F1 is continuous rather than binary).
+
+\para{Scoring protocol and noise.} Strict short-budget scoring inflates format-driven fragility (\secref{sec:format}), and we quantified this only for \llama on \arc. llama.cpp batching changed about 5\% of identical requests (0--2\% correctness flips), so effects of 2 points or less are within noise. The exclusion of \llama \agnews was decided post hoc.
+
+\para{Edit design.} The synonym lexicon and typo rates are our own choices. We checked meaning preservation by inspection rather than with human raters, and a few substitutions are slightly ungrammatical (\eg ``an specialist'').
+
+\subsection{Broader implications}
+Our results matter for anyone who reports benchmark numbers or maintains production prompts. Single-prompt evaluation can over- or under-state a model by 10--25 points for a small model, depending on details that look irrelevant. Edits to the parts of a prompt that define the answer space or the output format deserve the same regression testing as code changes. Conversely, our finding that some edits help suggests that reported scores reflect partly the prompt author's luck. We see no direct risk of misuse: the edits we study are benign by design and are much weaker than existing adversarial attacks.

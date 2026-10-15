@@ -1,0 +1,5 @@
+task,n,delta_pts,flip_rate,identical_frac
+sst2,100,0.0,0.02,0.98
+agnews,100,0.0,0.0,1.0
+arc,100,1.0,0.01,0.99
+squad,100,-0.33333333333333337,0.0,0.99

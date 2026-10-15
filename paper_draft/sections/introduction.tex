@@ -1,0 +1,44 @@
+\section{Introduction}
+\label{sec:intro}
+
+Prompts are edited constantly. A developer tidies the whitespace in a system prompt, a colleague lowercases a template, someone replaces ``choose'' with ``pick'' or moves the persona sentence to the end. People usually treat these edits as harmless because they do not change what the prompt asks for. Benchmark results, however, are usually reported for a single prompt. If a benign edit can move accuracy by several points, then single-prompt numbers are hard to reproduce, and prompt maintenance needs the same regression testing as code.
+
+Prior work has shown that large language models (LLMs) are sensitive to prompt formatting~\citep{sclar2024quantifying,voronov2024mind}, to paraphrased instructions~\citep{mizrahi2024state}, to adversarial character-, word- and sentence-level perturbations~\citep{zhu2023promptbench}, and to the order of few-shot examples~\citep{lu2022fantastically}. Several sensitivity scores have been proposed~\citep{zhuo2024prosa,chatterjee2024posix}. These studies establish that sensitivity exists. Three practical questions remain open. {\bf Which kinds of everyday edits are dangerous?} Adversarial perturbations are chosen to hurt, and paraphrase studies mix many kinds of change into a single rewrite. {\bf Does fragility depend on the task type?} Most studies focus on one task format. {\bf Do edits compound?} A real edit often combines several operations, and it is unclear whether their effects add up, saturate or amplify each other.
+
+We address these questions with a controlled study. We define the \emph{Prompt Fragility Index} (\pfi) as the relative drop in task score when an instruction is edited (\secref{sec:method}). We build a seeded editor with six benign edit types: \ws, \caps, \punct, \typo, \syn and \reord (\figref{fig:overview}). Edits touch only the instruction, never the task input. The editor's randomness is keyed by seed, edit type and sentence, so a combined edit contains the same local edits as its single-edit parts. This lets us measure the interaction term of a combination directly, not just its total effect. We apply 12 single-edit and 12 combined-edit conditions to four tasks covering three task types: \sst and \agnews (classification), \arc (multiple choice) and \squad (short-answer generation). We evaluate two small instruction-tuned models, \qwen and \llama, scoring 20,800 real generations. We tested three hypotheses, set before running the study. H1: \reord and \syn cause the largest drops (more than 8 points), while \ws and \caps cause drops below 1 point. H2: classification is the most robust task type (mean \pfi about 0.05) and generation the most fragile (mean \pfi about 0.22). H3: combining three or more edit types compounds super-additively, by 30--50\%.
+
+All three hypotheses are refuted as stated. The damaging edit depends on the model--task pair, not on the edit category. For \qwen, \caps and \punct, usually considered cosmetic, cost 25.0 and 16.0 points on \agnews, while \reord never costs more than 4.0 points on any task. For \llama, \syn costs 14.5 points on \arc but \emph{improves} \sst accuracy by 6.0 points. Generation is not the most fragile task type: its mean single-edit \pfi is 0.03 for \qwen and 0.00 for \llama, versus 0.10 for \qwen on \agnews. Combined edits are super-additive only for generation (combined/additive ratio of 1.29--1.61 for \qwen on \squad). For classification and multiple choice they are sub-additive (ratio 0.38--0.80), because an item can break only once. Two mechanisms explain most large effects. Edits that alter the \emph{answer-space specification}, such as removing the commas from a label list, break classification. Edits that weaken the \emph{output-format constraint} trigger preambles that a strict parser marks as wrong. With a longer output budget and a lenient parser, \llama's 28--48-point drops on \arc shrink to 6--10 points or vanish.
+
+Our contributions are:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+    \item We propose a controlled protocol for measuring prompt fragility under \emph{benign} edits: a six-type edit taxonomy, a seeded editor whose combined edits reuse the exact local edits of their parts, and a paired, item-level analysis with flip rates and two no-interaction baselines (additive and union).
+    \item We conduct a study over 2 models, 4 tasks, 3 task types and 26 prompt conditions (20,800 scored generations), including a noise-floor control. The study refutes three common intuitions about which edits and tasks are fragile.
+    \item We identify two mechanisms behind large effects, answer-space disruption and format-constraint erosion, using label-distribution analysis, a format-versus-content decomposition and a robustness re-run with a longer output budget and a lenient parser.
+    \item We give practical recommendations: treat label lists and output-format instructions as load-bearing, report \pfi together with the parser and token budget, and report flip rates alongside net score changes.
+\end{itemize}
+
+\Secref{sec:related} reviews related work, \secref{sec:method} describes the protocol, \secref{sec:results} presents results for each hypothesis, \secref{sec:discussion} analyzes mechanisms and limitations, and \secref{sec:conclusion} concludes.
+
+\begin{figure}[t]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}p{0.17\linewidth}p{0.79\linewidth}@{}}
+\toprule
+\textbf{Condition} & \textbf{Instruction given to the model (\agnews, seed 0, as logged)} \\
+\midrule
+original & You are an expert news topic classifier. Read the news article provided below carefully. Decide which topic the article belongs to; the possible topics are World, Sports, Business, and Sci/Tech. Respond with only the topic name and nothing else. \\
+\ws & {\color{gray}$\hookleftarrow$}You{\color{gray}$\to$}are an {\color{gray}$\to$}expert news\,\,\,topic classifier.{\color{gray}$\hookleftarrow$}Read the\,\,\,news article \dots \\
+\caps & you are an expert news topic classifier. read the news article \dots\ the possible topics are \textbf{world, sports, business, and sci/tech}. respond \dots \\
+\punct & You are an expert news topic classifier Read the news article \dots\ the possible topics are \textbf{World Sports Business and Sci/Tech:} Respond \dots\ nothing else \\
+\typo & You are an expetr news tpic classifier. Read the news article porvided below carefully. Deide wgich topic \dots \\
+\syn & You are an specialist news subject classification system. Examine the news article supplied that follows carefully. Judge which topic the story belongs to; \dots\ Answer with solely the topic name and no other text. \\
+\reord & Read the news article \dots\ carefully. Respond with only the topic name and nothing else. You are an expert news topic classifier. Decide which topic \dots \\
+\midrule
+\combo{semantic3} {\scriptsize(syn+reord+typo)} & Examine the news article spuplied that follows carefully. Answer with solely the topic name and no other text. You are an specialits news suject classification system. Jdge wgich topic the story belongs to; \dots \\
+\bottomrule
+\end{tabular}
+\vspace{2pt}
+\caption{Examples of our six benign edit types and one combined edit, applied to the \agnews instruction (seed 0, copied from the experiment logs; ``\dots'' marks unchanged text omitted here, {\color{gray}$\to$} a tab, {\color{gray}$\hookleftarrow$} a newline). Edits touch only the instruction, never the article. The label words are protected from \syn and \typo edits, but not from \caps or \punct. The combined edit reuses the local edits of its single-edit parts (compare the \syn and \reord rows); it differs only where two operators hit the same word, \eg a typo landing on a substituted synonym (``spuplied''). The two bold label lists are the edits that cost \qwen 25 and 16 points (\secref{sec:mechanisms}).}
+\label{fig:overview}
+\end{figure}

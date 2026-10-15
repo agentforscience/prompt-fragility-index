@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "stages": {
+    "resource_finder": {
+      "success": true,
+      "skipped": true
+    },
+    "experiment_runner": {
+      "success": true,
+      "return_code": 0,
+      "elapsed_time": 11779.25674366951,
+      "log_file": "/data/summereunann/neurico-workspaces/the_prompt_fragility_index__me_20261014_161052_ad3855b6/logs/execution_claude.log",
+      "transcript_file": "/data/summereunann/neurico-workspaces/the_prompt_fragility_index__me_20261014_161052_ad3855b6/logs/execution_claude_transcript.jsonl",
+      "background_processes_terminated": false
+    }
+  },
+  "work_dir": "/data/summereunann/neurico-workspaces/the_prompt_fragility_index__me_20261014_161052_ad3855b6"
+}

@@ -1,0 +1,66 @@
+\section{Method}
+\label{sec:method}
+
+\subsection{Problem formulation}
+A prompt for item $x$ is the concatenation $p(I, x) = I \oplus s \oplus x$, where $I$ is an instruction of four sentences, $s$ is a separator and $x$ is the task input. An edit $e$ maps $I$ to $e(I)$ and may also change $s$, but never changes $x$. Let $m_i(I) \in [0,1]$ be the score of a model's response to item $i$ under instruction $I$ (accuracy or token F1), and let $M(I) = \frac{1}{n}\sum_i m_i(I)$. We define
+\begin{equation}
+\Delta(e) = M(I) - M(e(I)), \qquad \pfi(e) = \frac{\Delta(e)}{M(I)}, \qquad \mathrm{Flip}(e) = \frac{1}{n}\sum_{i} \1\big[c_i(I) \neq c_i(e(I))\big],
+\end{equation}
+where $c_i$ is item correctness (for \squad, $c_i = \1[m_i \geq 0.5]$). A positive $\Delta$ or \pfi means the edit hurts. Because edits can also help, we additionally report $|\pfi|$. The flip rate captures churn that the net score change hides, such as an edit that fixes five items and breaks five others.
+
+\para{Compounding.}
+For a combined edit $E = \{e_1, \dots, e_k\}$, we compare $\Delta(E)$ with two baselines that assume no interaction. The \emph{additive} baseline is $\sum_j \Delta(e_j)$, as in hypothesis H3. However, per-item scores are bounded, so an item broken by two edits is counted twice by the additive baseline, even though it can break only once. We therefore also use a \emph{union} baseline, under which the combination breaks an item if and only if any of its parts breaks it:
+\begin{equation}
+\Delta_{\cup}(E) = M(I) - \frac{1}{n}\sum_i \min\big(m_i(I),\, m_i(e_1(I)), \dots, m_i(e_k(I))\big).
+\end{equation}
+The interaction is $\Delta(E)$ minus the chosen baseline, and we report the ratio $\Delta(E)/\sum_j\Delta(e_j)$. A positive interaction means the edits amplify each other.
+
+\subsection{Edit operators}
+\label{sec:edits}
+We implement six edit types that a human editor might apply without intending to change meaning (\figref{fig:overview}).
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+    \item \ws: 30\% of spaces become 2--3 spaces or a tab. Sentence joiners and the instruction--input separator become random spaces or newlines.
+    \item \caps: seed 0 lowercases everything. Seed 1 randomly upper-, lower-, title- or swap-cases 35\% of words.
+    \item \punct: each of \texttt{. , : ; !\ ?} is deleted with probability 0.6 or swapped for another mark with probability 0.2.
+    \item \typo: about 15\% of words with at least four letters receive an adjacent-letter swap, a dropped or duplicated letter, or a keyboard-neighbor substitution.
+    \item \syn: each eligible word is replaced, with probability 0.6, by a near-synonym from a hand-curated lexicon (\eg ``Choose the single best answer from the options'' $\to$ ``Pick the single most suitable answer among the choices'').
+    \item \reord: a random non-identity permutation of the four instruction sentences.
+\end{itemize}
+Label words (\eg ``positive'', ``Sports'', ``A''--``D'') are protected from \syn and \typo edits so that the answer space keeps its wording.
+
+\para{Seeded composition.}
+Each operator draws its randomness from a generator keyed by (seed, edit type, sentence index). Word-level operators are applied in a fixed order (\syn, \typo, \punct, \caps), followed by \ws and finally \reord. As a result, a combined edit at seed $s$ contains the same local edits as the corresponding single edits at seed $s$. The two differ only where operators touch the same word, for example when a typo lands on a substituted synonym. This design lets us attribute the interaction term to the combination itself, not to different random draws.
+
+\para{Conditions.}
+We run each edit type with 2 seeds (12 single-edit conditions). We also test six combinations at both seeds (12 combined conditions): \combo{cosmetic2} (\ws+\caps), \combo{semantic2} (\syn+\reord), \combo{cosmetic3} (\ws+\caps+\punct), \combo{semantic3} (\syn+\reord+\typo), \combo{mixed3} (\caps+\syn+\reord) and \combo{all6}. Together with the original prompt and an identical rerun of it, which serves as a noise-floor control, this gives 26 conditions per task.
+
+\subsection{Tasks, models and scoring}
+
+\para{Tasks.}
+We use four tasks with $n = 100$ items each (\tabref{tab:tasks}): \sst~\citep{socher2013recursive} for binary sentiment classification, \agnews~\citep{zhang2015character} for 4-way topic classification, ARC-Challenge~\citep{clark2018think} for 4-option multiple-choice science QA, and \squad v1.1~\citep{rajpurkar2016squad} for short-answer generation, restricted to passages of at most 110 words. Every instruction has the same structure: a persona sentence, a reading directive, a task definition and an output-format constraint. \Appref{app:prompts} lists all four instructions.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{@{}llllc@{}}
+\toprule
+\textbf{Task} & \textbf{Type} & \textbf{Metric} & \textbf{Output budget} & \textbf{Items} \\
+\midrule
+\sst (validation) & classification, 2-way & accuracy & 4 tokens & 100 \\
+\agnews (test) & classification, 4-way & accuracy & 5 tokens & 100 \\
+\arc (test) & multiple choice, 4 options & accuracy & 8 tokens & 100 \\
+\squad v1.1 (validation) & short-answer generation & token F1 & 24 tokens & 100 \\
+\bottomrule
+\end{tabular}
+\caption{Tasks. Each prompt is a four-sentence instruction, a separator and the task input. All edits apply only to the instruction.}
+\label{tab:tasks}
+\end{table}
+
+\para{Models and decoding.}
+No API key for a hosted model was available to us, and the host had no GPU. We therefore ran two open-weight instruction-tuned models locally with llama.cpp~\citep{llamacpp} on CPU: \qwen-Instruct~\citep{qwen2024qwen25} and \llama-Instruct~\citep{grattafiori2024llama3}, both quantized to Q8\_0. We use greedy decoding (temperature 0, seed 42), each model's default chat template and a single user turn. These compute limits also fixed the small model size, the short output budgets and $n=100$. All results come from real model generations; nothing is simulated.
+
+\para{Scoring.}
+For classification, we take the earliest label mentioned in the output, matched case-insensitively. For \arc, we take the leading option letter, or otherwise the first standalone uppercase letter A--D. For \squad, we compute normalized token F1 against the best-matching gold answer. Outputs we cannot parse count as wrong. This strict scoring matches the prompts, which ask for only the label, letter or span. \Secref{sec:format} measures how much this choice matters.
+
+\subsection{Statistical analysis}
+We compute paired 95\% bootstrap confidence intervals over items with 10,000 resamples~\citep{efron1993bootstrap}. For single edit types, we first average the two seeds per item. We test each edit type and task with an exact McNemar test~\citep{mcnemar1947note} for binary metrics and a Wilcoxon signed-rank test~\citep{wilcoxon1945individual} for F1, pooling the two seeds. We apply Holm correction~\citep{holm1979simple} across the 24 edit-type $\times$ task tests of each model. Confidence intervals for interaction terms also come from the item bootstrap.

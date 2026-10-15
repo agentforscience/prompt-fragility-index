@@ -1,0 +1,17 @@
+\section{Related Work}
+\label{sec:related}
+
+\para{Sensitivity to prompt format.}
+\citet{sclar2024quantifying} show that formatting choices that do not change meaning, such as separators, casing and spacing, can move few-shot accuracy by tens of points, and they propose reporting a performance interval over many formats. \citet{voronov2024mind} find that the choice of template can matter more than the in-context learning method under study. \citet{webson2022prompt} show that models can perform similarly with irrelevant or even misleading instructions, which raises the question of what models actually use in a prompt. These studies sample formats from a large grammar or compare whole templates. Unlike them, we isolate six benign edit types applied by a single editor to a fixed instruction, so we can attribute an effect to a specific kind of change and to the part of the prompt it touches.
+
+\para{Paraphrases and multi-prompt evaluation.}
+\citet{mizrahi2024state} show that paraphrasing instructions changes both absolute scores and model rankings, and argue for evaluating with a set of paraphrases. HELM~\citep{liang2023helm} also reports variation across prompt choices. A paraphrase usually combines several changes at once (new words, new order, new punctuation). Building on this line of work, we split a paraphrase into its parts (\syn, \reord, \punct, \caps) and test whether their effects add up when combined.
+
+\para{Adversarial and behavioral robustness.}
+PromptBench~\citep{zhu2023promptbench} attacks prompts at the character, word, sentence and semantic levels and finds that word-level attacks are the most damaging. CheckList~\citep{ribeiro2020checklist} uses perturbation templates to test model behavior. Adversarial attacks search for the worst case, so they measure an upper bound on harm. We instead sample random edits of the kind a human editor makes, which estimates the \emph{typical} effect of routine prompt maintenance, and we find that some random edits help.
+
+\para{Prompt sensitivity indices.}
+ProSA~\citep{zhuo2024prosa} defines an instance-level sensitivity score over prompt variants and relates it to model confidence. POSIX~\citep{chatterjee2024posix} measures the change in the log-likelihood of a response across intent-preserving prompt variants. Our \pfi is deliberately simple, a relative drop in task score, and we pair it with an item flip rate because net changes hide churn. Unlike these indices, we decompose fragility by edit type and task type, and we measure interaction effects between edit types.
+
+\para{Order and label effects.}
+\citet{lu2022fantastically} show that the order of few-shot examples can swing accuracy from near state-of-the-art to near chance. \citet{zhao2021calibrate} identify majority-label, recency and common-token biases in few-shot prompting. We study the order of \emph{instruction sentences} rather than examples. We also observe a related label bias: \llama predicts the first-listed label for 98\% of \agnews items, and reordering the instruction weakens this collapse (\secref{sec:edits_help}).

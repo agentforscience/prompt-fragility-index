@@ -1,0 +1,37 @@
+%%%%% PROJECT-SPECIFIC MACROS %%%%%
+\usepackage{xspace}
+
+% Method / metric names
+\newcommand{\pfi}{\textsc{PFI}\xspace}
+\newcommand{\Dpts}{$\Delta$\xspace}
+
+% Models
+\newcommand{\qwen}{\textsc{Qwen2.5-1.5B}\xspace}
+\newcommand{\llama}{\textsc{Llama-3.2-1B}\xspace}
+
+% Datasets
+\newcommand{\sst}{\textsc{SST-2}\xspace}
+\newcommand{\agnews}{\textsc{AG News}\xspace}
+\newcommand{\arc}{\textsc{ARC-C}\xspace}
+\newcommand{\squad}{\textsc{SQuAD}\xspace}
+
+% Edit types
+\newcommand{\edit}[1]{\textit{#1}\xspace}
+\newcommand{\ws}{\edit{whitespace}}
+\newcommand{\caps}{\edit{capitalization}}
+\newcommand{\punct}{\edit{punctuation}}
+\newcommand{\typo}{\edit{typo}}
+\newcommand{\syn}{\edit{synonym}}
+\newcommand{\reord}{\edit{reorder}}
+\newcommand{\combo}[1]{\texttt{#1}\xspace}
+
+% Abbreviations
+\newcommand{\ie}{i.e.,\xspace}
+\newcommand{\eg}{e.g.,\xspace}
+
+% Small CI in tables
+\newcommand{\ci}[2]{{\scriptsize [#1, #2]}}
+
+% Appendix references
+\def\appref#1{appendix~\ref{#1}}
+\def\Appref#1{Appendix~\ref{#1}}

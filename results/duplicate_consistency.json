@@ -1,0 +1,6 @@
+{
+  "llama3.2-1b": {
+    "n_pairs": 212,
+    "identical_output_frac": 0.9528301886792453
+  }
+}
